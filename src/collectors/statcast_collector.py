@@ -10,5 +10,9 @@ def fetch_season_statcast(season_start: str, end_date: str, keep_cols: list[str]
     if raw_pd.empty:
         return pl.DataFrame(schema={col: pl.Utf8 for col in keep_cols})
 
-    raw = pl.from_pandas(raw_pd).select(keep_cols)
+    raw = (
+        pl.from_pandas(raw_pd)
+        .select(keep_cols)
+        .with_columns(pl.col("game_date").cast(pl.Date))
+    )
     return raw

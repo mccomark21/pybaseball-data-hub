@@ -25,7 +25,7 @@ def update_player_index(current_mlbam_ids: list[int], index_path: str) -> None:
     if not new_ids:
         return
 
-    lookup_pd = playerid_reverse_lookup(new_ids, key_type="key_mlbam")
+    lookup_pd = playerid_reverse_lookup(new_ids, key_type="mlbam")
     if lookup_pd.empty:
         return
 
