@@ -57,11 +57,11 @@ def join_datasets(
     Parameters
     ----------
     game_log_path:
-        Path to ``batter_game_log.parquet``.
+        String path to ``batter_game_log.parquet``.
     player_index_path:
-        Path to ``player_index.parquet``.
+        String path to ``player_index.parquet``.
     output_path:
-        Destination path for the enriched parquet file.
+        String destination path for the enriched parquet file.
 
     Returns
     -------
@@ -102,8 +102,8 @@ def join_datasets(
     matched_unique_players = (
         joined
         .filter(pl.col("player_name").is_not_null())
-        ["mlbam_id"]
-        .n_unique()
+        .select(pl.col("mlbam_id").n_unique())
+        .item()
     )
 
     return JoinReport(
