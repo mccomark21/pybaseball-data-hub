@@ -28,6 +28,9 @@ jobs:
       - name: Run daily collection
         run: python scripts/run_daily.py
 
+      - name: Join processed datasets
+        run: python scripts/join_datasets.py
+
       - name: Commit and push data
         run: |
           git config user.name "github-actions[bot]"
