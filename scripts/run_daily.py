@@ -14,6 +14,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.collectors.player_index_builder import update_player_index
 from src.collectors.statcast_collector import fetch_season_statcast
+from src.collectors.mlb_api_collector import fetch_boxscore_batting_stats
 from src.processors.metric_calculator import aggregate_batter_game_stats
 
 CONFIG_PATH = PROJECT_ROOT / "config" / "metrics.yaml"
@@ -48,13 +49,44 @@ def main() -> None:
 
     print(f"Fetched {raw.height:,} pitch rows. Aggregating...")
 
-    game_log = aggregate_batter_game_stats(
+    statcast_agg = aggregate_batter_game_stats(
         raw=raw.lazy(),
         pull_threshold=config["pull_threshold"],
-        sb_event_map=config["sb_event_map"],
     ).collect()
 
-    print(f"Aggregated to {game_log.height:,} new batter-game rows.")
+    print(f"Aggregated to {statcast_agg.height:,} new batter-game rows.")
+    print(f"Fetching MLB API batting stats: {start_date} to {yesterday}...")
+
+    mlb_stats = fetch_boxscore_batting_stats(
+        start_date=start_date,
+        end_date=yesterday,
+    )
+
+    game_log = (
+        statcast_agg.lazy()
+        .join(mlb_stats.lazy(), on=["mlbam_id", "game_date"], how="left")
+        .with_columns([
+            pl.col("bb").fill_null(0),
+            pl.col("k").fill_null(0),
+            pl.col("sb").fill_null(0),
+        ])
+        .select([
+            "game_date",
+            "mlbam_id",
+            "season",
+            "pa",
+            "bbe",
+            "xwoba_num",
+            "xwoba_denom",
+            "pull_air_events",
+            "bb",
+            "k",
+            "sb",
+        ])
+        .collect()
+    )
+
+    print(f"Merged {game_log.height:,} batter-game rows.")
 
     GAME_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     if GAME_LOG_PATH.exists():

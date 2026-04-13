@@ -10,13 +10,5 @@ keep_cols:
   - estimated_woba_using_speedangle
   - woba_denom
   - hc_x
-  - on_1b
-  - on_2b
-  - on_3b
 
 pull_threshold: 125
-
-sb_event_map:
-  stolen_base_2b: on_1b
-  stolen_base_3b: on_2b
-  stolen_base_home: on_3b
