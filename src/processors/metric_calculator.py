@@ -41,7 +41,12 @@ def _aggregate_batting(raw: pl.LazyFrame, pull_threshold: int) -> pl.LazyFrame:
             (pl.col("woba_denom") == 1).sum().cast(pl.Int32).alias("pa"),
             (pl.col("type") == "X").sum().cast(pl.Int32).alias("bbe"),
             pl.when(pl.col("woba_denom") == 1)
-            .then(pl.col("estimated_woba_using_speedangle"))
+            .then(
+                pl.coalesce(
+                    pl.col("estimated_woba_using_speedangle"),
+                    pl.col("woba_value"),
+                )
+            )
             .otherwise(0.0)
             .sum()
             .cast(pl.Float32)

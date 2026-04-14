@@ -8,6 +8,7 @@ keep_cols:
   - type
   - bb_type
   - estimated_woba_using_speedangle
+  - woba_value
   - woba_denom
   - hc_x
 

@@ -1,3 +1,5 @@
+import datetime
+
 import polars as pl
 
 
@@ -14,7 +16,6 @@ def get_windowed_stats(
     lf = pl.scan_parquet(game_log_path)
 
     if window_days is not None:
-        import datetime
         cutoff = datetime.date.today() - datetime.timedelta(days=window_days)
         lf = lf.filter(pl.col("game_date") >= cutoff)
 
