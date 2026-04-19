@@ -5,7 +5,6 @@ from game-level parquet data.
 """
 
 import datetime
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -86,6 +85,23 @@ class TestSeasonToDate:
 
         player_a = result.filter(pl.col("mlbam_id") == 100)
         assert player_a["player_name"][0] == "Test Player A"
+
+    def test_sb_total_sum(self, sample_data):
+        gl_path, idx_path = sample_data
+        result = get_windowed_stats(None, gl_path, idx_path)
+
+        player_a = result.filter(pl.col("mlbam_id") == 100)
+        player_b = result.filter(pl.col("mlbam_id") == 200)
+
+        assert player_a["sb_total"][0] == 1
+        assert player_b["sb_total"][0] == 0
+
+    def test_sb_per_pa_not_exposed(self, sample_data):
+        gl_path, idx_path = sample_data
+        result = get_windowed_stats(None, gl_path, idx_path)
+
+        assert "sb_per_pa" not in result.columns
+        assert "sb_total" in result.columns
 
 
 class TestWindowedAggregation:

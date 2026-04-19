@@ -330,3 +330,101 @@ class TestEdgeCases:
         assert set(result.columns) == expected_cols
         assert result["xwoba_num"].dtype == pl.Float32
         assert result["xwoba_denom"].dtype == pl.Int32
+
+
+class TestPullAirEvents:
+    """Unit tests for pull-side air-ball event counting."""
+
+    def test_pull_threshold_boundary(self):
+        """Boundary rule should exclude hc_x == threshold for both handedness values."""
+        lf = _make_pitch_rows([
+            {
+                "stand": "R",
+                "type": "X",
+                "bb_type": "fly_ball",
+                "woba_denom": 1,
+                "hc_x": 124,
+            },
+            {
+                "stand": "R",
+                "type": "X",
+                "bb_type": "fly_ball",
+                "woba_denom": 1,
+                "hc_x": 125,
+            },
+            {
+                "stand": "L",
+                "type": "X",
+                "bb_type": "fly_ball",
+                "woba_denom": 1,
+                "hc_x": 125,
+            },
+            {
+                "stand": "L",
+                "type": "X",
+                "bb_type": "fly_ball",
+                "woba_denom": 1,
+                "hc_x": 126,
+            },
+        ])
+
+        result = aggregate_batter_game_stats(lf, PULL_THRESHOLD).collect()
+
+        # Pull events are R<125 and L>125, so only the 124 and 126 rows count.
+        assert result["pull_air_events"][0] == 2
+        assert result["bbe"][0] == 4
+
+    def test_non_fly_balls_do_not_count(self):
+        """Only fly balls should contribute to pull_air_events, even if pulled."""
+        lf = _make_pitch_rows([
+            {
+                "stand": "R",
+                "type": "X",
+                "bb_type": "line_drive",
+                "woba_denom": 1,
+                "hc_x": 100,
+            },
+            {
+                "stand": "L",
+                "type": "X",
+                "bb_type": "ground_ball",
+                "woba_denom": 1,
+                "hc_x": 150,
+            },
+            {
+                "stand": "R",
+                "type": "X",
+                "bb_type": "fly_ball",
+                "woba_denom": 1,
+                "hc_x": 100,
+            },
+        ])
+
+        result = aggregate_batter_game_stats(lf, PULL_THRESHOLD).collect()
+
+        assert result["pull_air_events"][0] == 1
+        assert result["bbe"][0] == 3
+
+    def test_null_hc_x_is_excluded(self):
+        """Rows missing hc_x should not be classified as pull-side air balls."""
+        lf = _make_pitch_rows([
+            {
+                "stand": "R",
+                "type": "X",
+                "bb_type": "fly_ball",
+                "woba_denom": 1,
+                "hc_x": None,
+            },
+            {
+                "stand": "R",
+                "type": "X",
+                "bb_type": "fly_ball",
+                "woba_denom": 1,
+                "hc_x": 90,
+            },
+        ])
+
+        result = aggregate_batter_game_stats(lf, PULL_THRESHOLD).collect()
+
+        assert result["pull_air_events"][0] == 1
+        assert result["bbe"][0] == 2

@@ -10,8 +10,8 @@ def get_windowed_stats(
 ) -> pl.DataFrame:
     """Aggregate batter stats over a rolling window (or season-to-date if None).
 
-    Reads the game log lazily, filters to the window, computes rates, and joins
-    player names from the index.
+    Reads the game log lazily, filters to the window, computes rates/totals,
+    and joins player names from the index.
     """
     lf = pl.scan_parquet(game_log_path)
 
@@ -28,7 +28,7 @@ def get_windowed_stats(
             (pl.sum("xwoba_num") / pl.sum("xwoba_denom")).alias("xwoba"),
             (pl.sum("pull_air_events") / pl.sum("bbe")).alias("pull_air_pct"),
             (pl.sum("bb") / pl.sum("k")).alias("bbk_ratio"),
-            (pl.sum("sb") / pl.sum("pa")).alias("sb_per_pa"),
+            pl.sum("sb").alias("sb_total"),
         ])
         .collect()
     )

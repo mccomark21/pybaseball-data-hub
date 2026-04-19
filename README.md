@@ -16,7 +16,7 @@ Each daily run:
 
 Stolen bases are attributed to the **actual runner**, not the batter at the plate, using Statcast's `on_1b`/`on_2b`/`on_3b` fields.
 
-Only raw counts are stored. Rates (xwOBA, pull air %, BB:K, SB/PA) are computed at query time so they aggregate correctly across any date window.
+Only raw counts are stored. Rates (xwOBA, pull air %, BB:K) are computed at query time so they aggregate correctly across any date window. Stolen bases are surfaced as totals.
 
 ---
 
@@ -116,7 +116,7 @@ stats = (
         (pl.sum("xwoba_num") / pl.sum("xwoba_denom")).alias("xwoba"),
         (pl.sum("pull_air_events") / pl.sum("bbe")).alias("pull_air_pct"),
         (pl.sum("bb") / pl.sum("k")).alias("bbk_ratio"),
-        (pl.sum("sb") / pl.sum("pa")).alias("sb_per_pa"),
+        pl.sum("sb").alias("sb_total"),
     ])
     .collect()
     .join(index, on="mlbam_id", how="left")
