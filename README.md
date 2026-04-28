@@ -188,6 +188,20 @@ This workspace includes custom agents under `.github/agents/` to speed up recurr
 
 ---
 
+## Custom Copilot Skills
+
+This workspace also includes reusable skills under `.github/skills/`.
+
+| Skill | Use When | Example Prompt |
+|---|---|---|
+| `readme-change-guardian` | code, schema, command, config, or workflow changes may have caused README drift | `run readme-change-guardian for my latest pipeline changes` |
+
+### Skill Files
+
+- `.github/skills/readme-change-guardian/SKILL.md`
+
+---
+
 ## Project Structure
 
 ```
