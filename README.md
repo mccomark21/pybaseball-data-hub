@@ -127,6 +127,38 @@ Available windows: 7 / 14 / 30 / 60 / 90 days, or season-to-date (omit the filte
 
 ---
 
+## MiLB Prospects Snapshot Pipeline
+
+This repo also supports a dedicated **minor-league prospects** snapshot pipeline driven by the deployed app API:
+
+- Source: `https://mccomark21.github.io/yahoo-fantasy-baseball-eval-app/api/prospects/latest.json`
+- Strict level filter: `A`, `A+`, `AA`, `AAA` only
+- Output shape: one row per player per window (`STD`, `30D`, `14D`, `7D`)
+- Artifacts:
+  - `data/processed/prospects_source_rows.parquet` (raw filtered source rows)
+  - `data/processed/prospects_snapshot.parquet` (player-window snapshot rows)
+
+Run it locally:
+
+```bash
+python scripts/run_prospects_weekly.py --season 2026
+```
+
+Optional arguments:
+
+- `--top-n 100` to keep top N players by `best_rank`
+- `--source-url ...` to override the API URL
+- `--output-path ...` and `--raw-output-path ...` to override output locations
+
+Notes:
+
+- The deployed app API is used as the prospect universe seed; date-window performance is then enriched from MLB StatsAPI with MiLB-only sport filters (`11`, `12`, `13`, `14`).
+- The snapshot now stores all currently available MiLB stat fields from StatsAPI using their native names (for example `plateAppearances`, `hits`, `doubles`, `triples`, `ops`, `woba`, `stolenBases`, `inningsPitched`, `strikeOuts`, `baseOnBalls`).
+- For rare name collisions on two-way players, an additional suffixed field may appear (for example `hits_hitting` and `hits_pitching`).
+- The pipeline is intentionally independent from the daily MLB Statcast collector.
+
+---
+
 ## Project Structure
 
 ```

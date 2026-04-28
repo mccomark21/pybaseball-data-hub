@@ -1,0 +1,19 @@
+source_url: "https://mccomark21.github.io/yahoo-fantasy-baseball-eval-app/api/prospects/latest.json"
+allowed_levels:
+  - "A"
+  - "A+"
+  - "AA"
+  - "AAA"
+windows:
+  - "STD"
+  - "30D"
+  - "14D"
+  - "7D"
+output_path: "data/processed/prospects_snapshot.parquet"
+raw_output_path: "data/processed/prospects_source_rows.parquet"
+timeout_seconds: 30
+milb_sport_ids:
+  - 11
+  - 12
+  - 13
+  - 14
