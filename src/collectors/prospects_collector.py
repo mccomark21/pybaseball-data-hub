@@ -1,7 +1,8 @@
 """Collector for deployed Yahoo app prospects API.
 
 This module fetches and parses the prospects payload exposed by the deployed app,
-then filters rows to explicit MiLB levels only.
+resolves conflicting player profile fields across sources, then filters rows to
+explicit MiLB levels only.
 """
 
 from __future__ import annotations
@@ -16,6 +17,74 @@ DEFAULT_PROSPECTS_URL = (
     "https://mccomark21.github.io/yahoo-fantasy-baseball-eval-app/api/prospects/latest.json"
 )
 DEFAULT_ALLOWED_LEVELS = frozenset({"A", "A+", "AA", "AAA"})
+SOURCE_PRIORITY = {"fangraphs": 0, "prospects_live": 1, "mlb": 2}
+PROFILE_FIELDS: tuple[str, ...] = (
+    "org",
+    "level",
+    "positions",
+    "age",
+    "eta",
+    "bats",
+    "throws",
+    "fv",
+    "ofp",
+    "stats_summary",
+    "scouting_report",
+    "notes",
+    "payload_scraped_at",
+    "collected_at",
+    "source_url",
+)
+
+
+def _first_non_null(values: Iterable[Any]) -> Any:
+    for value in values:
+        if pd.notna(value):
+            return value
+    return None
+
+
+def _source_priority(source: Any) -> int:
+    return SOURCE_PRIORITY.get(str(source).strip().lower(), len(SOURCE_PRIORITY))
+
+
+def _resolve_source_rows(
+    source_rows: pd.DataFrame,
+    allowed_levels: Iterable[str],
+) -> pd.DataFrame:
+    if source_rows.empty:
+        return source_rows.copy()
+
+    allowed_set = {str(value).upper() for value in allowed_levels}
+    retained_groups: list[pd.DataFrame] = []
+
+    # Fangraphs uses org abbreviations while MLB uses full team names, so player
+    # name is the only stable cross-source identity available in this payload.
+    for _, group in source_rows.groupby(["player_name"], dropna=False, sort=False):
+        ordered = group.sort_values(
+            by=["_source_priority", "_row_order"],
+            kind="stable",
+        )
+
+        resolved_fields = {
+            field: _first_non_null(ordered[field])
+            for field in PROFILE_FIELDS
+        }
+
+        resolved_level = resolved_fields["level"]
+        if resolved_level is None or str(resolved_level).upper() not in allowed_set:
+            continue
+
+        resolved_group = group.copy()
+        for field, value in resolved_fields.items():
+            resolved_group[field] = value
+        retained_groups.append(resolved_group)
+
+    if not retained_groups:
+        return source_rows.iloc[0:0].drop(columns=["_row_order", "_source_priority"], errors="ignore")
+
+    resolved = pd.concat(retained_groups, ignore_index=True)
+    return resolved.drop(columns=["_row_order", "_source_priority"], errors="ignore")
 
 
 def normalize_level(level: Any) -> str | None:
@@ -68,22 +137,19 @@ def parse_prospects_payload(
     allowed_levels: Iterable[str] = DEFAULT_ALLOWED_LEVELS,
     collected_at: datetime | None = None,
 ) -> pd.DataFrame:
-    """Parse and strictly filter prospects rows to explicit MiLB levels only."""
+    """Parse prospect rows, resolve source conflicts, and keep MiLB-only winners."""
     rows = payload.get("rows")
     if not isinstance(rows, list):
         raise ValueError("Prospects payload is missing rows")
 
-    allowed_set = {str(v).upper() for v in allowed_levels}
     collected = collected_at or datetime.now(timezone.utc)
 
     parsed_rows: list[dict[str, Any]] = []
-    for row in rows:
+    for row_order, row in enumerate(rows):
         if not isinstance(row, Mapping):
             continue
 
         normalized_level = normalize_level(row.get("level"))
-        if normalized_level is None or normalized_level not in allowed_set:
-            continue
 
         player_name = row.get("player_name")
         org = row.get("org")
@@ -98,6 +164,8 @@ def parse_prospects_payload(
 
         parsed_rows.append(
             {
+                "_row_order": row_order,
+                "_source_priority": _source_priority(row.get("source")),
                 "source": row.get("source"),
                 "rank": row.get("rank"),
                 "player_name": player_name,
@@ -126,7 +194,7 @@ def parse_prospects_payload(
     for column in ["rank", "age", "ofp"]:
         df[column] = pd.to_numeric(df[column], errors="coerce")
 
-    return df
+    return _resolve_source_rows(df, allowed_levels=allowed_levels)
 
 
 def collect_prospect_source_rows(

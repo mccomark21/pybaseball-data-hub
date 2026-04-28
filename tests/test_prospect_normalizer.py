@@ -170,3 +170,62 @@ def test_snapshot_merges_window_stats_when_provided() -> None:
     assert row_7d["inningsPitched"] == "4.0"
     assert row_7d["strikeOuts"] == 7
     assert pd.isna(row_std["plateAppearances"])
+
+
+def test_snapshot_prioritizes_fangraphs_profile_fields_across_conflicting_rows() -> None:
+    source_rows = pd.DataFrame(
+        [
+            {
+                "source": "mlb",
+                "rank": 2,
+                "player_name": "Konnor Griffin",
+                "org": "Pittsburgh Pirates",
+                "level": "A",
+                "positions": "SS",
+                "age": 20,
+                "eta": "2026",
+                "bats": "R",
+                "throws": "R",
+                "fv": "65",
+                "ofp": 65,
+                "stats_summary": None,
+                "scouting_report": None,
+                "notes": None,
+                "payload_scraped_at": "2026-04-28T00:00:00Z",
+                "collected_at": "2026-04-28T01:00:00+00:00",
+                "source_url": "https://example.test/prospects.json",
+            },
+            {
+                "source": "fangraphs",
+                "rank": 1,
+                "player_name": "Konnor Griffin",
+                "org": "PIT",
+                "level": "AAA",
+                "positions": "CF",
+                "age": 19,
+                "eta": "2027",
+                "bats": "L",
+                "throws": "R",
+                "fv": "70",
+                "ofp": 70,
+                "stats_summary": None,
+                "scouting_report": None,
+                "notes": None,
+                "payload_scraped_at": "2026-04-28T00:00:00Z",
+                "collected_at": "2026-04-28T01:00:00+00:00",
+                "source_url": "https://example.test/prospects.json",
+            },
+        ]
+    )
+
+    snapshot = build_prospects_snapshot(source_rows)
+    std_row = snapshot[snapshot["window"] == "STD"].iloc[0]
+
+    assert snapshot.shape[0] == 4
+    assert std_row["org"] == "PIT"
+    assert std_row["level"] == "AAA"
+    assert std_row["positions"] == "CF"
+    assert std_row["age"] == 19
+    assert std_row["bats"] == "L"
+    assert std_row["mlb_rank"] == 2
+    assert std_row["fangraphs_rank"] == 1

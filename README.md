@@ -133,6 +133,7 @@ This repo also supports a dedicated **minor-league prospects** snapshot pipeline
 
 - Source: `https://mccomark21.github.io/yahoo-fantasy-baseball-eval-app/api/prospects/latest.json`
 - Strict level filter: `A`, `A+`, `AA`, `AAA` only
+- Source precedence: Fangraphs profile fields win over Prospects Live and MLB before the MiLB-only level filter is applied
 - Output shape: one row per player per window (`STD`, `30D`, `14D`, `7D`)
 - Artifacts:
   - `data/processed/prospects_source_rows.parquet` (raw filtered source rows)
