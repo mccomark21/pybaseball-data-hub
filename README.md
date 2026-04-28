@@ -159,6 +159,35 @@ Notes:
 
 ---
 
+## Custom Copilot Agents
+
+This workspace includes custom agents under `.github/agents/` to speed up recurring workflows.
+
+| Agent | Use When | Example Prompt |
+|---|---|---|
+| `xwoba-validator` | validating xwOBA, checking drift vs Savant | `validate xwoba for this repo` |
+| `daily-pipeline-orchestrator` | running daily updates or full season refresh | `run daily pipeline update` |
+| `prospects-weekly-runner` | building weekly MiLB prospects snapshots | `run prospects weekly for season 2026 top 100` |
+| `window-aggregation-validator` | checking rolling window math or season-to-date consistency | `validate rolling window aggregation` |
+| `data-quality-inspector` | checking join coverage and unmatched MLBAM IDs | `inspect join data quality` |
+
+### Agent Files
+
+- `.github/agents/xwoba-validator.agent.md`
+- `.github/agents/daily-pipeline-orchestrator.agent.md`
+- `.github/agents/prospects-weekly-runner.agent.md`
+- `.github/agents/window-aggregation-validator.agent.md`
+- `.github/agents/data-quality-inspector.agent.md`
+
+### Recommended Order
+
+1. Start with `xwoba-validator` after metric logic changes.
+2. Use `daily-pipeline-orchestrator` for daily/full-season pipeline runs.
+3. Use `prospects-weekly-runner` for weekly snapshot generation.
+4. Use `window-aggregation-validator` and `data-quality-inspector` when diagnosing regressions.
+
+---
+
 ## Project Structure
 
 ```
