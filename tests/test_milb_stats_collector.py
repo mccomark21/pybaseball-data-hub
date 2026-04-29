@@ -57,7 +57,7 @@ def test_fetch_milb_group_pool_stats_collects_prefixed_fields() -> None:
                         {
                             "splits": [
                                 {
-                                    "player": {"id": 123},
+                                    "player": {"id": 123, "fullName": "Player A"},
                                     "sport": {"id": 11},
                                     "stat": {
                                         "plateAppearances": 20,
@@ -67,7 +67,7 @@ def test_fetch_milb_group_pool_stats_collects_prefixed_fields() -> None:
                                     },
                                 },
                                 {
-                                    "player": {"id": 456},
+                                    "player": {"id": 456, "fullName": "Player B"},
                                     "sport": {"id": 14},
                                     "stat": {
                                         "plateAppearances": 5,
@@ -92,6 +92,7 @@ def test_fetch_milb_group_pool_stats_collects_prefixed_fields() -> None:
 
     assert set(result.keys()) == {123, 456}
     assert result[123]["mlbam_id"] == 123
+    assert result[123]["player_name"] == "Player A"
     assert result[123]["plateAppearances"] == 20
     assert result[123]["hits"] == 6
     assert result[123]["doubles"] == 1
@@ -112,6 +113,7 @@ def test_collect_prospect_window_stats_emits_rows_for_all_windows(monkeypatch) -
             return {
                 444444: {
                     "mlbam_id": 444444,
+                    "player_name": "Player A",
                     "plateAppearances": 12,
                     "hits": 4,
                     "ops": ".760",
@@ -120,6 +122,7 @@ def test_collect_prospect_window_stats_emits_rows_for_all_windows(monkeypatch) -
         return {
             444444: {
                 "mlbam_id": 444444,
+                "player_name": "Player A",
                 "inningsPitched": "9.0",
                 "strikeOuts": 11,
                 "baseOnBalls": 3,
@@ -142,3 +145,37 @@ def test_collect_prospect_window_stats_emits_rows_for_all_windows(monkeypatch) -
     assert result["strikeOuts"].tolist() == [11, 11]
     assert result["hits"].tolist() == [4, 4]
     assert result["hits_pitching"].tolist() == [8, 8]
+
+
+def test_collect_prospect_window_stats_falls_back_to_pool_name_index(monkeypatch) -> None:
+    source_rows = pd.DataFrame(
+        [
+            {"player_name": "Bryce Rainer", "org": "DET", "level": "A+"},
+        ]
+    )
+
+    monkeypatch.setattr(collector, "resolve_mlbam_id", lambda **kwargs: None)
+
+    def _fake_fetch_group_pool(**kwargs):
+        if kwargs["group"] == "hitting":
+            return {
+                800614: {
+                    "mlbam_id": 800614,
+                    "player_name": "Bryce Rainer",
+                    "plateAppearances": 10,
+                    "hits": 3,
+                }
+            }
+        return {}
+
+    monkeypatch.setattr(collector, "fetch_milb_group_pool_stats", _fake_fetch_group_pool)
+
+    result = collector.collect_prospect_window_stats(
+        source_rows=source_rows,
+        windows=(("STD", None),),
+        as_of_date=date(2026, 4, 28),
+    )
+
+    assert result.shape[0] == 1
+    assert result.iloc[0]["mlbam_id"] == 800614
+    assert result.iloc[0]["plateAppearances"] == 10

@@ -7,12 +7,28 @@ pulls date-range hitting and pitching stats from the MiLB-only player pool.
 from __future__ import annotations
 
 from datetime import date, timedelta
+import re
 from typing import Any, Iterable, Mapping
+import unicodedata
 
 import pandas as pd
 import requests
 
 DEFAULT_MILB_SPORT_IDS: tuple[int, ...] = (11, 12, 13, 14)
+
+
+def _canonical_name(value: Any) -> str:
+    """Return a normalized name token for cross-endpoint matching."""
+    if value is None:
+        return ""
+
+    text = str(value).strip()
+    if not text:
+        return ""
+
+    folded = unicodedata.normalize("NFKD", text)
+    without_marks = "".join(char for char in folded if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9]", "", without_marks.casefold())
 
 
 def _safe_int(value: Any) -> int | None:
@@ -115,7 +131,10 @@ def fetch_milb_group_pool_stats(
         if not isinstance(stat_node, Mapping):
             continue
 
-        payload = {"mlbam_id": player_id}
+        payload = {
+            "mlbam_id": player_id,
+            "player_name": player_node.get("fullName"),
+        }
         for stat_key, stat_value in stat_node.items():
             payload[stat_key] = _normalize_stat_value(stat_value)
 
@@ -152,7 +171,7 @@ def collect_prospect_window_stats(
 
         def _merge_payload(record: dict[str, Any], payload: dict[str, Any], group: str) -> None:
             for key, value in payload.items():
-                if key == "mlbam_id":
+                if key in {"mlbam_id", "player_name"}:
                     continue
 
                 if key not in record or _is_missing(record[key]):
@@ -167,6 +186,15 @@ def collect_prospect_window_stats(
                 if not _is_missing(value) and existing != value:
                     # Preserve both values for rare two-way collisions.
                     record[f"{key}_{group}"] = value
+
+        def _build_name_index(pool: Mapping[int, Mapping[str, Any]]) -> dict[str, set[int]]:
+            name_index: dict[str, set[int]] = {}
+            for player_id, payload in pool.items():
+                canonical = _canonical_name(payload.get("player_name"))
+                if not canonical:
+                    continue
+                name_index.setdefault(canonical, set()).add(int(player_id))
+            return name_index
 
         for identity in identities.itertuples(index=False):
             player_name, org, level = identity
@@ -189,6 +217,7 @@ def collect_prospect_window_stats(
                     "level": level,
                     "window": window_label,
                     "mlbam_id": mlbam_id,
+                    "_canonical_name": _canonical_name(player_name),
                 }
 
                 records.append(metric_row)
@@ -223,10 +252,25 @@ def collect_prospect_window_stats(
             except requests.RequestException:
                 pitching_pool = {}
 
+            hitting_name_index = _build_name_index(hitting_pool)
+            pitching_name_index = _build_name_index(pitching_pool)
+
             for record in records:
                 if record["window"] != window_label:
                     continue
                 mlbam_id = record.get("mlbam_id")
+
+                if mlbam_id is None:
+                    canonical_name = record.get("_canonical_name")
+                    candidates = set()
+                    if canonical_name:
+                        candidates.update(hitting_name_index.get(canonical_name, set()))
+                        candidates.update(pitching_name_index.get(canonical_name, set()))
+
+                    if len(candidates) == 1:
+                        mlbam_id = int(next(iter(candidates)))
+                        record["mlbam_id"] = mlbam_id
+
                 if mlbam_id is None:
                     continue
 
@@ -240,4 +284,8 @@ def collect_prospect_window_stats(
 
     if not records:
         return pd.DataFrame()
-    return pd.DataFrame(records)
+
+    result = pd.DataFrame(records)
+    if "_canonical_name" in result.columns:
+        result = result.drop(columns=["_canonical_name"])
+    return result
