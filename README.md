@@ -142,7 +142,7 @@ This repo also supports a dedicated **minor-league prospects** snapshot pipeline
 Run it locally:
 
 ```bash
-python scripts/run_prospects_weekly.py --season 2026
+python scripts/run_prospects_daily.py --season 2026
 ```
 
 Optional arguments:
@@ -168,7 +168,7 @@ This workspace includes custom agents under `.github/agents/` to speed up recurr
 |---|---|---|
 | `xwoba-validator` | validating xwOBA, checking drift vs Savant | `validate xwoba for this repo` |
 | `daily-pipeline-orchestrator` | running daily updates or full season refresh | `run daily pipeline update` |
-| `prospects-weekly-runner` | building weekly MiLB prospects snapshots | `run prospects weekly for season 2026 top 100` |
+| `prospects-daily-runner` | building daily MiLB prospects snapshots | `run prospects daily for season 2026 top 100` |
 | `window-aggregation-validator` | checking rolling window math or season-to-date consistency | `validate rolling window aggregation` |
 | `data-quality-inspector` | checking join coverage and unmatched MLBAM IDs | `inspect join data quality` |
 
@@ -176,7 +176,7 @@ This workspace includes custom agents under `.github/agents/` to speed up recurr
 
 - `.github/agents/xwoba-validator.agent.md`
 - `.github/agents/daily-pipeline-orchestrator.agent.md`
-- `.github/agents/prospects-weekly-runner.agent.md`
+- `.github/agents/prospects-daily-runner.agent.md`
 - `.github/agents/window-aggregation-validator.agent.md`
 - `.github/agents/data-quality-inspector.agent.md`
 
@@ -184,7 +184,7 @@ This workspace includes custom agents under `.github/agents/` to speed up recurr
 
 1. Start with `xwoba-validator` after metric logic changes.
 2. Use `daily-pipeline-orchestrator` for daily/full-season pipeline runs.
-3. Use `prospects-weekly-runner` for weekly snapshot generation.
+3. Use `prospects-daily-runner` for daily snapshot generation.
 4. Use `window-aggregation-validator` and `data-quality-inspector` when diagnosing regressions.
 
 ---

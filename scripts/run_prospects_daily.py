@@ -1,4 +1,4 @@
-"""Weekly MiLB prospects snapshot pipeline.
+"""Daily MiLB prospects snapshot pipeline.
 
 Fetches prospect rows from the deployed app API, keeps MiLB-only levels,
 and writes both source rows and 4-window snapshot parquet artifacts.
