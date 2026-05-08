@@ -2,9 +2,7 @@
 
 import argparse
 import sys
-from datetime import datetime, timedelta
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import polars as pl
 import yaml
@@ -14,9 +12,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.collectors.player_index_builder import update_player_index
-from src.collectors.statcast_collector import fetch_season_statcast
-from src.collectors.mlb_api_collector import fetch_boxscore_batting_stats
-from src.processors.metric_calculator import aggregate_batter_game_stats
+from src.processors.daily_game_log_module import (
+    DailyGameLogConfig,
+    DailyGameLogModule,
+    DailyGameLogRequest,
+)
 
 CONFIG_PATH = PROJECT_ROOT / "config" / "metrics.yaml"
 GAME_LOG_PATH = PROJECT_ROOT / "data" / "processed" / "batter_game_log.parquet"
@@ -43,79 +43,30 @@ def main() -> None:
     args = parse_args()
     config = load_config()
 
-    et = ZoneInfo("America/New_York")
-    today = datetime.now(et)
-    yesterday = (today - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    if args.full_season:
-        start_date = config["season_start"]
-        print(f"Fetching FULL SEASON Statcast data: {start_date} to {yesterday}")
-    else:
-        start_date = (today - timedelta(days=3)).strftime("%Y-%m-%d")
-        print(f"Fetching Statcast data: {start_date} to {yesterday} (3-day window)")
-
-    raw = fetch_season_statcast(
-        start_date=start_date,
-        end_date=yesterday,
-        keep_cols=config["keep_cols"],
+    mode = "full_season" if args.full_season else "daily"
+    request = DailyGameLogRequest(mode=mode)
+    module = DailyGameLogModule(
+        DailyGameLogConfig(
+            season_start=config["season_start"],
+            keep_cols=config["keep_cols"],
+            pull_threshold=config["pull_threshold"],
+            game_log_path=GAME_LOG_PATH,
+        )
     )
 
-    if raw.is_empty():
+    result = module.refresh(request)
+
+    if result.status == "no_data":
         print("No data returned. Exiting.")
         return
 
-    print(f"Fetched {raw.height:,} pitch rows. Aggregating...")
-
-    statcast_agg = aggregate_batter_game_stats(
-        raw=raw.lazy(),
-        pull_threshold=config["pull_threshold"],
-    ).collect()
-
-    print(f"Aggregated to {statcast_agg.height:,} new batter-game rows.")
-    print(f"Fetching MLB API batting stats: {start_date} to {yesterday}...")
-
-    mlb_stats = fetch_boxscore_batting_stats(
-        start_date=start_date,
-        end_date=yesterday,
+    verb = "Overwrote" if args.full_season else "Wrote"
+    print(
+        f"{verb} {result.output_path.name} ({result.total_rows:,} total batter-game rows) "
+        f"for {result.start_date.isoformat()} to {result.end_date.isoformat()}"
     )
 
-    game_log = (
-        statcast_agg.lazy()
-        .join(mlb_stats.lazy(), on=["mlbam_id", "game_date"], how="left")
-        .with_columns([
-            pl.col("bb").fill_null(0),
-            pl.col("k").fill_null(0),
-            pl.col("sb").fill_null(0),
-        ])
-        .select([
-            "game_date",
-            "mlbam_id",
-            "season",
-            "pa",
-            "bbe",
-            "xwoba_num",
-            "xwoba_denom",
-            "pull_air_events",
-            "bb",
-            "k",
-            "sb",
-        ])
-        .collect()
-    )
-
-    print(f"Merged {game_log.height:,} batter-game rows.")
-
-    GAME_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    if not args.full_season and GAME_LOG_PATH.exists():
-        existing = pl.read_parquet(str(GAME_LOG_PATH))
-        game_log = (
-            pl.concat([game_log, existing])
-            .unique(subset=["mlbam_id", "game_date"], keep="first")
-        )
-    game_log.write_parquet(str(GAME_LOG_PATH))
-    mode = "overwrote" if args.full_season else "wrote"
-    print(f"{mode.capitalize()} {GAME_LOG_PATH.name} ({game_log.height:,} total batter-game rows)")
-
+    game_log = pl.read_parquet(str(result.output_path))
     mlbam_ids = game_log["mlbam_id"].unique().to_list()
     update_player_index(mlbam_ids, str(PLAYER_INDEX_PATH))
     print(f"Updated {PLAYER_INDEX_PATH}")

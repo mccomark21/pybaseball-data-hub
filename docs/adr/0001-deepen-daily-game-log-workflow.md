@@ -1,0 +1,3 @@
+# Deepen The Daily Game Log Workflow
+
+We will move the daily batter game-log workflow behind one module that owns Statcast fetch orchestration, Statcast aggregation, MLB boxscore enrichment, canonical schema shaping, and parquet write plus dedup policy. The module will hide the true external seams behind adapters for Statcast and MLB StatsAPI, while player-index refresh remains a separate step after the game-log run. We are choosing this shape because the current workflow logic is spread across multiple files, which reduces navigability and forces callers to understand join keys, null-fill rules, and persistence policy that should live behind one interface.
